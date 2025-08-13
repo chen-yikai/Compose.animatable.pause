@@ -31,6 +31,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -46,6 +47,7 @@ import dev.eliaschen.composeanimatablepause.ui.theme.ComposeanimatablepauseTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,16 +78,25 @@ fun BoxAnimation() {
     val targetPos = -deviceWidth
 
     var speeding by remember { mutableStateOf(false) }
+    var startTime by remember { mutableLongStateOf(0L) }
+    var currentTime by remember { mutableLongStateOf(0L) }
 
-    val speedUpDuration = 2000
+    val speedUpDuration = 4000
     val speedUpFactor = 4
     val speedUpVelocity = velocity * speedUpFactor
+
+    LaunchedEffect(Unit) {
+        while (isActive) {
+            currentTime = System.currentTimeMillis()
+            delay(100)
+        }
+    }
 
     suspend fun speedUp() {
         speeding = true
         var boxPos = boxMovement.value
         boxMovement.stop()
-        val startTime = System.currentTimeMillis()
+        startTime = System.currentTimeMillis()
         while (true) {
             val elapsedTime = System.currentTimeMillis() - startTime
             boxPos -= speedUpVelocity * 16
@@ -94,10 +105,21 @@ fun BoxAnimation() {
             boxMovement.snapTo(boxPos)
             delay(16)
         }
-        isPause = true
-        delay(16)
-        isPause = false
+
         speeding = false
+
+        oldBoxMovement = boxMovement.value
+        val remainingDistance = oldBoxMovement.coerceAtLeast(0f) - (-boxWidth)
+        val timeLeft = (remainingDistance / velocity).toInt()
+        boxMovement.animateTo(
+            targetValue = targetPos,
+            animationSpec = tween(
+                durationMillis = timeLeft,
+                easing = LinearEasing
+            )
+        )
+
+        animationKey++
     }
 
 
@@ -146,11 +168,14 @@ fun BoxAnimation() {
             ) {
                 Text(if (isPause) "Resume" else "Pause")
             }
-            OutlinedButton(onClick = {
-                scope.launch {
-                    speedUp()
-                }
-            }, enabled = !speeding) { Text(if (speeding) "Speeding..." else "Speed Up") }
+            OutlinedButton(
+                onClick = {
+                    scope.launch {
+                        speedUp()
+                    }
+                },
+                enabled = !speeding
+            ) { Text(if (speeding) "Speeding... ${"%.1f".format((currentTime - startTime) / 1000f)}s" else "Speed Up") }
         }
     }
 }
