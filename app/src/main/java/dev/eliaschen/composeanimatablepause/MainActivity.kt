@@ -63,7 +63,6 @@ class MainActivity : ComponentActivity() {
 fun BoxAnimation() {
     val device = LocalConfiguration.current
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
     val deviceWidth = device.screenWidthDp.toFloat()
     val boxWidth = 100f
 
@@ -76,22 +75,29 @@ fun BoxAnimation() {
     val velocity = (deviceWidth + boxWidth) / duration
     val targetPos = -deviceWidth
 
-    suspend fun speedUp() {
-        val speedUpDuration = 2000
-        val speedUpFactor = 4
-        var boxPos = boxMovement.value
-        val speedUpVelocity = velocity * speedUpFactor
+    var speeding by remember { mutableStateOf(false) }
 
+    val speedUpDuration = 2000
+    val speedUpFactor = 4
+    val speedUpVelocity = velocity * speedUpFactor
+
+    suspend fun speedUp() {
+        speeding = true
+        var boxPos = boxMovement.value
         boxMovement.stop()
         val startTime = System.currentTimeMillis()
         while (true) {
             val elapsedTime = System.currentTimeMillis() - startTime
             boxPos -= speedUpVelocity * 16
-            if (elapsedTime >= speedUpDuration || boxPos <= targetPos) break
+            if (elapsedTime >= speedUpDuration) break
+            if (targetPos >= boxPos) boxPos = deviceWidth
             boxMovement.snapTo(boxPos)
             delay(16)
         }
-        animationKey++
+        isPause = true
+        delay(16)
+        isPause = false
+        speeding = false
     }
 
 
@@ -144,7 +150,7 @@ fun BoxAnimation() {
                 scope.launch {
                     speedUp()
                 }
-            }) { Text("Speed Up") }
+            }, enabled = !speeding) { Text(if (speeding) "Speeding..." else "Speed Up") }
         }
     }
 }
